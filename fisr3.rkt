@@ -92,22 +92,66 @@
 ; (bvlshr (bvadd hi lo) (bv #x00000001 32))))
 
 ;; (define (check-fisr-helper impl bits)
-;;   (define n (bit-field->flonum bits))
+;;   (define n (flobit->real bits))
 ;;   (cond [(> n 0)
-;;       (define result (bit-field->flonum (impl bits)))
+;;       (define result (flobit->real (impl bits)))
 ;;       (define roundtrip (/ 1 (* result result)))
 ;;       (define err (abs (- n roundtrip)))
 ;;       ; (assert (<= (/ err (abs n)) 0.5))
 ;;       (0)
 ;;    ]))
 
+; Doesn't work
+;; (define (check-fisr-helper impl bits)
+;;   (define n (flobit->real bits))
+;;   (cond [(> n 0)
+;;     (assert (not (bveq bits (impl bits)))
+;;   ])
+;;   (0)
+;; )
+
 (define (check-fisr-helper impl bits)
-  (define n (bit-field->flonum bits))
-  #t
+  ; (define n (flobit->real bits))
+  ; (assume (> n 0))
+  (assert (not (bveq bits (impl bits))))
 )
 
-;; (define (check-fisr-helper impl bits)
-;;   (assert (not (bveq bits (impl bits)))))
+;; (define (asdf n)
+;;   (bvshl
+;;    n
+;;    (bv 9 32)
+;;    )
+;;   )
+;; (check-fisr-helper asdf (bv #b00111110001000000000000000000000 32))
+;; 
+;; ; Okay this works
+;; (define (example-fisr-helper number)
+;;   (bvsub (bv #b01011111001101110101100111011111 32) (bvlshr number (bv 1 32)))
+;; )
+;; (check-fisr-helper example-fisr-helper (bv #b00111110001000000000000000000000 32))
+;; (example-fisr-helper (bv #b00111110001000000000000000000000 32))
+
+;;   (cond 
+;;       (define result (flobit->real (impl bits)))
+;;       (define roundtrip (/ 1 (* result result)))
+;;       (define err (abs (- n roundtrip)))
+;;       ; (assert (<= (/ err (abs n)) 0.5))
+;;       (0)
+;;    ]))
+
+; (define (check-fisr-helper impl bits)
+   ; (define n (bit-field->flonum bits))
+   ; #t
+; )
+
+; Works
+; (define (check-fisr-helper impl bits)
+;    (assert (not (bveq bits (impl bits))))
+; )
+
+; (define (check-fisr-helper impl bits)
+;    (assert (not (bveq bits (impl bits))))
+; )
 
 
 (require rosette/lib/synthax)     ; Require the sketching library.
@@ -125,15 +169,28 @@
 
 ; sketch a fast implementation of the midpoint calculation which describes the space of
 ; all expressions from the fast-int32 grammar that have parse trees of depth 2 at most.
-; (define (fisr-sketch n)
-;   (fast-int32 n #:depth 2))
+(define (fisr-sketch n)
+  (fast-int32 n #:depth 2))
 
 ; Binds each provided identifier to a distinct symbolic constant of the given solvable type
 ; I.e. makes it so that l and h represent all 32 bit integers.
-; (define-symbolic all_possible_int32bv int32?)
+(define-symbolic all_possible_int32bv int32?)
 
-; (define sol
-;     (synthesize
-;      #:forall    (list all_possible_int32bv)
-;      #:guarantee (check-fisr-helper fisr-sketch all_possible_int32bv)))
+(define sol
+    (synthesize
+     #:forall    (list all_possible_int32bv)
+     #:guarantee (check-fisr-helper fisr-sketch all_possible_int32bv)))
 ; (print-forms sol)
+
+;; (+
+;;  -127
+;;  (bitvector->natural
+;;   (bvlshr
+;;    (bvshl
+;;     all_possible_int32bv
+;;     (bv #x00000001 32)
+;;     )
+;;    (bv #x00000018 32)
+;;    )
+;;   )
+;;  )
