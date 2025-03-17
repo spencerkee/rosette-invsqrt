@@ -10,11 +10,15 @@
   (bv i int32?))
 
 (define (pow-of-2 num)
-  ; (bitvector->natural (bvshl (bv #b00000001 8) (bv (- num 1) 8)))
-  (cond
-    [(< 0 num) (bitvector->natural (bvshl (bv #b00000001 8) (bv num 8)))]
-    [(> 0 num) (/ 1 (bitvector->natural (bvshl (bv #b00000001 8) (bv (abs num) 8))))]
+  (assert (<= -126 num))
+  (assert (>= 127 num))
+  (let ([abs-exponent (bitvector->natural (bvshl (bv #b00000001 127) (bv (abs num) 127)))])
+    (assert (not (equal? abs-exponent 0)))
+    (cond
+    [(< 0 num) abs-exponent]
+    [(> 0 num) (/ 1 abs-exponent)]
     [else 1])
+  )
 )
 
 (define (flobit->real flobit)
@@ -28,27 +32,6 @@
       1
     )
     (pow-of-2 (- (bitvector->natural (bvlshr (bvshl flobit (bv #b1 32)) (bv 24 32))) 127))
-    ; This next line by itself works, but doing expt doesn't work?
-    ; (- (bitvector->natural (bvlshr (bvshl flobit (bv #b1 32)) (bv 24 32))) 127)
-    ; (expt
-     ; (- (bitvector->natural (bvlshr (bvshl flobit (bv #b1 32)) (bv 24 32))) 127)
-     ; 2
-     ; (- (bitvector->natural (bvlshr (bvshl flobit (bv #b1 32)) (bv 24 32))) 127)
-      ; (- (bitvector->natural (bvlshr (bvshl (bv #b00111110001000000000000000000000 32) (bv #b1 32)) (bv 24 32))) 127)
-      
-;;       (-
-;;         (bitvector->natural
-;;           (bvlshr
-;;             (bvshl
-;;               flobit
-;;               (bv #b1 32)
-;;             )
-;;             (bv 24 32)
-;;           )
-;;         )
-;;         127
-;;       )
-    ; )
     (/
       (bitvector->natural
         (bvadd
@@ -66,41 +49,9 @@
     )
   )
 )
-
 ; (bitvector->natural (bit 31 (bv #b00111110001000000000000000000000 32)))
 
-(flobit->real (bv #b00111110001000000000000000000000 32))
-
-; bvlshr is right, bvshl is left
-; (bvadd (bv 8388608 32) (bvlshr (bvshl (bv #b10111110010000000000000000000000 32) (bv 9 32)) (bv 9 32)))
-;; (/
-;;  (bitvector->natural
-;;   (bvadd
-;;    (bv 8388608 32)
-;;    (bvlshr
-;;     (bvshl
-;;      (bv #b10111110010000000000000000000000 32)
-;;      (bv 9 32)
-;;      )
-;;     (bv 9 32))
-;;    )
-;;   )
-;;  (expt 2 23)
-;; )
-
-
-;128
-;1.5
-
-
-; (bvshl (bv #b10111110001000000000000000000000 32) (bv #b01111111100000000000000000000000 32))
-; (bitvector->natural (bv #b10111110001000000000000000000000 32))
-; (bv 1 3)
-; (bv #b10111110001000000000000000000000 32)
-; (bit 31 (bv #b10111110001000000000000000000000 32))
-;(define (fisr number)
-;  (bit-field->flonum (fisr-helper (flonum->bit-field number)))
-;)
+; (flobit->real (bv #b00111110001000000000000000000000 32))
 
 ; (define (fisr-helper bits)
 ;  (- 6910387280431496141 (arithmetic-shift (flonum->bit-field number) -1)
@@ -191,6 +142,7 @@
 ; I.e. makes it so that l and h represent all 32 bit integers.
 (define-symbolic all_possible_int32bv int32?)
 
+;; (flobit->real (bv #b1 8))
 (define cex (verify (check-fisr-helper example-fisr-helper all_possible_int32bv)))
 (define counterexample_bv (evaluate all_possible_int32bv cex))
 (displayln "Counterexample:")
@@ -201,23 +153,10 @@
 (displayln (bitvector->natural
             (example-fisr-helper counterexample_bv)))
 (displayln "Applying checker:")
-(flobit->real counterexample_bv)
+; (- (bitvector->natural (bvlshr (bvshl counterexample_bv (bv #b1 32)) (bv 24 32))) 127)
+; (bitvector->natural (bvshl (bv #b00000001 8) (bv (abs -95) 8)))
+; (flobit->real counterexample_bv)
 
-(/
- (bitvector->natural
-  (bvadd
-   (bv 8388608 32)
-   (bvlshr
-    (bvshl
-     counterexample_bv
-     (bv 9 32)
-     )
-    (bv 9 32)
-    )
-   )
-  )
- (expt 2 23)
- )
 ; (check-fisr-helper example-fisr-helper counterexample_bv)
 ; (example-fisr-helper (bv #x3f7a3bea 32))
 
