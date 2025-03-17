@@ -1,5 +1,5 @@
 #lang rosette/safe
-(require math/flonum)
+; (require math/flonum)
 
 ; int32? is a shorthand for the type (bitvector 32).
 (define int32? (bitvector 32))
@@ -8,6 +8,14 @@
 ; To do the inverse use bitvector->integer
 (define (int32 i)
   (bv i int32?))
+
+(define (pow-of-2 num)
+  ; (bitvector->natural (bvshl (bv #b00000001 8) (bv (- num 1) 8)))
+  (cond
+    [(< 0 num) (bitvector->natural (bvshl (bv #b00000001 8) (bv num 8)))]
+    [(> 0 num) (/ 1 (bitvector->natural (bvshl (bv #b00000001 8) (bv (abs num) 8))))]
+    [else 1])
+)
 
 (define (flobit->real flobit)
   (*
@@ -19,21 +27,28 @@
       -1
       1
     )
-    (expt
-      2
-      (-
-        (bitvector->natural
-          (bvlshr
-            (bvshl
-              flobit
-              (bv #b1 32)
-            )
-            (bv 24 32)
-          )
-        )
-        127
-      )
-    )
+    (pow-of-2 (- (bitvector->natural (bvlshr (bvshl flobit (bv #b1 32)) (bv 24 32))) 127))
+    ; This next line by itself works, but doing expt doesn't work?
+    ; (- (bitvector->natural (bvlshr (bvshl flobit (bv #b1 32)) (bv 24 32))) 127)
+    ; (expt
+     ; (- (bitvector->natural (bvlshr (bvshl flobit (bv #b1 32)) (bv 24 32))) 127)
+     ; 2
+     ; (- (bitvector->natural (bvlshr (bvshl flobit (bv #b1 32)) (bv 24 32))) 127)
+      ; (- (bitvector->natural (bvlshr (bvshl (bv #b00111110001000000000000000000000 32) (bv #b1 32)) (bv 24 32))) 127)
+      
+;;       (-
+;;         (bitvector->natural
+;;           (bvlshr
+;;             (bvshl
+;;               flobit
+;;               (bv #b1 32)
+;;             )
+;;             (bv 24 32)
+;;           )
+;;         )
+;;         127
+;;       )
+    ; )
     (/
       (bitvector->natural
         (bvadd
@@ -111,8 +126,8 @@
 ;; )
 
 (define (check-fisr-helper impl bits)
-  ; (define n (flobit->real bits))
-  ; (assume (> n 0))
+  (define n (flobit->real bits))
+  (assume (> n 0))
   (assert (not (bveq bits (impl bits))))
 )
 
@@ -125,9 +140,9 @@
 ;; (check-fisr-helper asdf (bv #b00111110001000000000000000000000 32))
 ;; 
 ;; ; Okay this works
-;; (define (example-fisr-helper number)
-;;   (bvsub (bv #b01011111001101110101100111011111 32) (bvlshr number (bv 1 32)))
-;; )
+(define (example-fisr-helper number)
+  (bvsub (bv #b01011111001101110101100111011111 32) (bvlshr number (bv 1 32)))
+)
 ;; (check-fisr-helper example-fisr-helper (bv #b00111110001000000000000000000000 32))
 ;; (example-fisr-helper (bv #b00111110001000000000000000000000 32))
 
@@ -176,10 +191,40 @@
 ; I.e. makes it so that l and h represent all 32 bit integers.
 (define-symbolic all_possible_int32bv int32?)
 
-(define sol
-    (synthesize
-     #:forall    (list all_possible_int32bv)
-     #:guarantee (check-fisr-helper fisr-sketch all_possible_int32bv)))
+(define cex (verify (check-fisr-helper example-fisr-helper all_possible_int32bv)))
+(define counterexample_bv (evaluate all_possible_int32bv cex))
+(displayln "Counterexample:")
+(displayln counterexample_bv)                     
+(displayln (bitvector->integer counterexample_bv))
+(displayln "Output:")
+(displayln (example-fisr-helper counterexample_bv))
+(displayln (bitvector->natural
+            (example-fisr-helper counterexample_bv)))
+(displayln "Applying checker:")
+(flobit->real counterexample_bv)
+
+(/
+ (bitvector->natural
+  (bvadd
+   (bv 8388608 32)
+   (bvlshr
+    (bvshl
+     counterexample_bv
+     (bv 9 32)
+     )
+    (bv 9 32)
+    )
+   )
+  )
+ (expt 2 23)
+ )
+; (check-fisr-helper example-fisr-helper counterexample_bv)
+; (example-fisr-helper (bv #x3f7a3bea 32))
+
+;; (define sol
+;;    (synthesize
+;;      #:forall    (list all_possible_int32bv)
+;;      #:guarantee (check-fisr-helper fisr-sketch all_possible_int32bv)))
 ; (print-forms sol)
 
 ;; (+
